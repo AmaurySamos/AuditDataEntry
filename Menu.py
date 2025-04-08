@@ -8,7 +8,7 @@ import AddFile
 import AddRequest
 import logging
 
-class Menu(ttk.Frame):
+class MenuM(ttk.Frame):
     def __init__(self, master_window):
         super().__init__(master_window, padding=(20,10))
     
@@ -26,24 +26,14 @@ class Menu(ttk.Frame):
             print(f"Failed to initialize BigQuery client or ensure dataset existence: {e}")
         
         # Add widgets or other initialization code here
-        instruction = ttk.Label(master_window, text="Welcome to the Menu!", bootstyle="primary")
-        instruction.pack(pady=10)
 
         self.pack(fill=BOTH, expand=YES)
-        
+        self.create_dropdown_menu()
         self.data = []
        
         self.colors = master_window.style.colors
 
-        instruction_text = "Please enter your audit information: " 
-        instruction = ttk.Label(self, text=instruction_text, width=50)
-        instruction.pack(fill=X, pady=10)
-
         self.create_buttonbox()  
-        
-        instruction_text1 = "Active Audits: " 
-        instruction = ttk.Label(self, text=instruction_text1, width=50)
-        instruction.pack(fill=X, pady=10)
 
         if self.bigquery_client:
             self.fetch_existing_data()
@@ -57,58 +47,29 @@ class Menu(ttk.Frame):
         
         Audit_btn = ttk.Button(
 			master=button_container,
-			text="Add Audit",
+			text="Add New Audit",
 			command=self.openAuditNewWindow,
 			bootstyle=SUCCESS,
 			width=15,
 		)
         Audit_btn.pack(side=LEFT, padx=5)
         
-        File_btn = ttk.Button(
-            master=button_container,
-            text="Add File",
-            command=self.openFileNewWindow,
-            bootstyle=SUCCESS,
-            width=15,
-        )
+    def create_dropdown_menu(self):
+        navbar = ttk.Frame(self, padding=(10, 5))
+        navbar.pack(fill=X, side=TOP)
 
-        File_btn.pack(side=LEFT, padx=5)
+        menu_button = ttk.Menubutton(navbar, text="☰ Menu", bootstyle="info-outline", width=10)
+        menu = ttk.Menu(menu_button, tearoff=0)
+        menu_button.config(menu=menu)
 
-        Request_btn = ttk.Button(
-            master=button_container,
-            text="Add Request",
-            command=self.openRequestNewWindow,
-            bootstyle=SUCCESS,
-            width=15,
-        )
+        menu.add_command(label="📩 Add Request", command=self.openRequestNewWindow)
+        menu.add_command(label="📋 Add Management Reaponse", command=self.openMangementNewWindow)
+        menu.add_command(label="📊 Add Risk Matrix", command=self.openRiskNewWindow)
+        menu.add_separator()
+        menu.add_command(label="📉 Reporting", background="purple", command=self.openExportNewWindow)         
+        
 
-        Request_btn.pack(side=LEFT, padx=5)
-    
-    def create_table(self):
-        coldata = [
-            {"text": "Audit ID", "stretch": False},
-            {"text": "Audit Name"},
-            {"text": "Auditor ID"},
-            {"text": "Audit Description"},
-            {"text": "Audit Importance Level"},
-            {"text": "Audit Status"},
-            {"text": "Audit Start Date"},
-            {"text": "Audit End Date"},
-            {"text": "Audit Actual End Date"},
-        ]
-
-        table = Tableview(
-            master=self,
-            coldata=coldata,
-            rowdata=self.data,
-            paginated=True,
-            searchable=True,
-            bootstyle=PRIMARY,
-            # stripecolor=(self.colors.light, None),
-        )
-
-        table.pack(fill=BOTH, expand=YES, padx=10, pady=10)
-        return table
+        menu_button.pack(side=RIGHT)           
     
     def ensure_dataset_exists(self,client, dataset_id):
         """Ensure that a BigQuery dataset exists."""
@@ -117,28 +78,79 @@ class Menu(ttk.Frame):
             print(f"Dataset {dataset_id} already exists.")
         except bigquery.NotFound:
             # Dataset not found; create it
-            dataset = bigquery.Dataset(dataset_id)
-            dataset = client.create_dataset(dataset)  # Make an API request
-            print(f"Created dataset {dataset_id}.")
+            print(f"Database don't exists {dataset_id}.")
+    
+    def create_table(self):
+        coldata = [
+            {"text": "Audit ID", "stretch": False},
+            {"text": "Auditor Name"},
+            {"text": "Audit Project"},
+            {"text": "Epic"},
+            {"text": "UserStory"},
+            {"text": "Division Name"},
+            {"text": "Department"},
+            {"text": "FY - Quarter"},
+            {"text": "Audit Status"},
+            {"text": "Audit Start Date"},
+            {"text": "Audit End Date"},
+            {"text": "Audit Actual Delivered Date"},
+            
+        ]
+
+        table = Tableview(
+            master=self,
+            coldata=coldata,
+            rowdata=self.data,
+            paginated=True,
+            searchable=True,
+            autofit=True,
+            bootstyle=PRIMARY,
+            # stripecolor=(self.colors.light, None),
+        )
+
+        table.pack(fill=BOTH, expand=YES, padx=10, pady=10)       
+        return table
     
     def fetch_existing_data(self): 
         if not self.bigquery_client:
             print("BigQuery client not available. Skipping data fetch.")
             return
     
-        query = "SELECT * FROM `audit-447319.Audits.Audit` where audit_status = 'Active' "
+        query = """
+            SELECT 
+                ap.audit_id
+                ,a.auditor_name
+                ,ap.audit_project
+                ,ap.epic
+                ,ap.userstory
+                ,d.division_name
+                ,d.department
+                ,ap.fy_quarter
+                ,ap.status_of_audit
+                ,ap.audit_start_date
+                ,ap.date_for_deliverable
+                ,ap.actual_date_delivered 
+            FROM `audit-447319.Audits.Audit_Program` ap
+                JOIN `audit-447319.Audits.Auditor` a on ap.auditor_id = a.auditor_id  
+                JOIN `audit-447319.Audits.Division` d on ap.division_id = d.division_id
+            where 
+                status_of_audit = 'In Progress'"""     
+        
         try:
             results = self.bigquery_client.query(query)
             self.data = [(
             row["audit_id"],
-            row["audit_name"],
-            row["auditor_id"],
-            row["audit_description"],
-            row["audit_importance_level"],
-            row["audit_status"],
+            row["auditor_name"],
+            row["audit_project"],
+            row["epic"],
+            row["userstory"],
+            row["division_name"],
+            row["department"],
+            row["fy_quarter"],
+            row["status_of_audit"],
             row["audit_start_date"],
-            row["audit_end_date"],
-            row["audit_actual_end_date"],
+            row["date_for_deliverable"],
+            row["actual_date_delivered"],
             ) 
             for row in results
             ]
@@ -147,20 +159,29 @@ class Menu(ttk.Frame):
             print(f"Failed to fetch data: {e}")
                    
     def openAuditNewWindow(self):
-        app1 = ttk.Toplevel("Enter Audit", "superhero", resizable=(True, True))
+        app1 = ttk.Toplevel("Enter New Audit", "superhero", resizable=(True, True))
         AddAudit.Audit(app1)
         app1.mainloop()
         
-    def openFileNewWindow(self):
-        app1 = ttk.Toplevel("Enter File", "superhero", resizable=(True, True))
-        AddFile.File(app1)
-        app1.mainloop()
-        
     def openRequestNewWindow(self):
-        app1 = ttk.Toplevel("Enter Request", "superhero", resizable=(True, True))
+        app1 = ttk.Toplevel("Enter Request", "darkly", resizable=(True, True))
         AddRequest.Request(app1)
         app1.mainloop()
         
+    def openMangementNewWindow(self):
+        app1 = ttk.Toplevel("Enter Managemnet Response", "superhero", resizable=(True, True))
+        AddFile.File(app1)
+        app1.mainloop()
+        
+    def openRiskNewWindow(self):
+        app1 = ttk.Toplevel("Enter Risks", "superhero", resizable=(True, True))
+        AddRequest.Request(app1)
+        app1.mainloop()
+        
+    def openExportNewWindow(self):
+        app1 = ttk.Toplevel("Export Date", "superhero", resizable=(True, True))
+        AddRequest.Request(app1)
+        app1.mainloop()    
     # def on_submit():
     #     pass # an empty function definition
 

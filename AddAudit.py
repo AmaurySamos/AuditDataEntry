@@ -1,5 +1,6 @@
 import os 
 from google.cloud import bigquery
+from google.api_core.exceptions import NotFound  # Import the correct NotFound exception
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 from ttkbootstrap.toast import ToastNotification
@@ -7,7 +8,7 @@ from ttkbootstrap.tableview import Tableview
 from ttkbootstrap.validation import add_regex_validation
 from datetime import datetime
 import db
-##import logging
+import logging
 
 class Audit(ttk.Frame):
        
@@ -258,10 +259,10 @@ class Audit(ttk.Frame):
     def create_table_if_not_exists(self,client, dataset_id, table_id):
         """Ensure a BigQuery table exists."""
         try:
-            table_ref = f"{dataset_id}.{table_id}"
+            table_ref = client.dataset(dataset_id).table(table_id)  # Correct table reference
             client.get_table(table_ref)  # Try fetching the table
-            print(f"Table {table_ref} already exists.")
-        except bigquery.NotFound:
+            print(f"Table {dataset_id}.{table_id} already exists.")
+        except NotFound:
             schema = [
                 bigquery.SchemaField("audit_id", "STRING", mode="REQUIRED"),
                 bigquery.SchemaField("audit_name", "STRING", mode="REQUIRED"),
@@ -275,7 +276,7 @@ class Audit(ttk.Frame):
             ]
             table = bigquery.Table(table_ref, schema=schema)
             client.create_table(table)  # Make an API request
-            print(f"Created table {table_ref}.")
+            print(f"Created table {dataset_id}.{table_id}.")
 
      #**************************TABLE CREATION*************************** 
     def create_table(self):
